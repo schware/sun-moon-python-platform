@@ -58,10 +58,13 @@ libs/                          # shared libraries — every service may depend o
   netframework-ai-agent/       #   provider-agnostic tool-calling Agent loop + ToolRegistry
   netframework-contracts/      #   ONLY plain pydantic models for cross-service messages — no logic,
                                 #   no dependency on anything else in this repo
+  netframework-batch/          #   generic Job/Step/Chunk engine (Reader/Processor/Writer Protocols) —
+                                #   the Python counterpart to sun-moon-c-server's batch.h/batch.c
 
 services/                      # independently deployable — separate process, separate port, separate DB
   order-service/                #   domain/ application/ infrastructure/ interfaces/ + main.py
   ai-agent-service/              #   application/ interfaces/ events/ + main.py
+  batch-service/                 #   jobs/ + main.py — a one-shot CLI, not a long-running server
 ```
 
 ## Why this is a monorepo, not a modular monolith
@@ -80,7 +83,7 @@ import each other.** Every dependency between them is either (a) `libs/netframew
 service's public REST API. That's what lets two different developers own
 these two services without ever touching each other's pull requests.
 
-## The two seams between services
+## The seams between services
 
 1. **Synchronous read — HTTP.** `ai-agent-service`'s `get_order` tool
    (`services/ai-agent-service/src/ai_agent_service/application/order_client.py`)
@@ -96,6 +99,15 @@ these two services without ever touching each other's pull requests.
    (`services/ai-agent-service/src/ai_agent_service/events/order_events_handler.py`)
    and asks its agent to draft a one-line operational note. Neither service
    imports the other's domain model — only the shared `OrderCreatedEvent` shape.
+
+3. **Chunked synchronous read — HTTP, paginated.** `batch-service`'s
+   `OrderServiceReader` (`services/batch-service/src/batch_service/jobs/order_summary.py`)
+   pages through `order-service`'s public `GET /orders?limit=&offset=` one
+   chunk at a time, feeding a generic Job/Step/Chunk engine
+   (`libs/netframework-batch`) — the same design, and the same REST
+   contract, as [`sun-moon-c-server`](https://github.com/schware/sun-moon-c-server)'s
+   `batch_runner` (see that repo's ADR-0001 and this repo's
+   [ADR-0010](docs/adr/0010-batch-service-design.md) for the direct comparison).
 
 Domain events vs. integration events, made concrete:
 `order_service.domain.events.OrderCreated` (internal, drained by the
@@ -141,6 +153,12 @@ printf 'hello\nORDER_COUNT\n' | nc localhost 8090   # order-service's TCP adapte
 Watch ai-agent-service's terminal after the `curl -X POST /orders` above —
 an `ai_agent_order_note` log line appears, delivered purely through Redis.
 
+Run the batch job (one-shot — it exits when done, no terminal to leave open):
+```bash
+uv run --package batch-service python -m batch_service.main
+cat reports/order_daily_summary_summary.json   # {"order_count": N, "total_revenue_cents": ...}
+```
+
 ## Quick start (Docker Compose — real Redis)
 
 ```bash
@@ -156,13 +174,17 @@ in this environment since Docker isn't installed here — verify on first use.)*
 ```bash
 uv run --package order-service pytest services/order-service/tests
 uv run --package ai-agent-service pytest services/ai-agent-service/tests
+uv run --package batch-service pytest services/batch-service/tests
+uv run --package netframework-batch pytest libs/netframework-batch/tests
 ```
-Both suites run with **no Redis and no cross-service network calls** —
-`order-service`'s tests swap in `netframework_core.eventbus.local_bus.LocalEventBus`
-and assert on what it *tried* to publish; `ai-agent-service`'s tests use a
-`FakeOrderClient`/`RecordingAssistant` instead of real HTTP/agent calls.
-This is only possible because both seams above are constructor-injected
-interfaces, never hardcoded.
+All suites run with **no Redis, no real order-service, and no
+cross-service network calls** — `order-service`'s tests swap in
+`netframework_core.eventbus.local_bus.LocalEventBus` and assert on what it
+*tried* to publish; `ai-agent-service`'s tests use a
+`FakeOrderClient`/`RecordingAssistant`; `batch-service`'s tests inject an
+`OrderServiceReader` built with `httpx.MockTransport` instead of a real
+HTTP connection. This is only possible because every seam above is a
+constructor-injected interface, never hardcoded.
 
 ## Adding a new service
 
@@ -192,11 +214,12 @@ httpx (inter-service HTTP), Anthropic SDK (optional, real agent reasoning).
 
 ## Planned next steps
 
-- A `batch-service` implementing the Job → Step → Chunk
-  (Reader/Processor/Writer) pattern over `order-service`'s existing REST
-  API — see the [`alignment`](https://github.com/schware/alignment) repo's
-  ADR-0006 for why (a companion `sun-moon-c-server` implementation of the
-  same design, in C, is planned there too)
+- A direct comparison note in `batch-service`'s own docs against
+  `sun-moon-c-server`'s order-summary job (both implement the same design
+  — see [ADR-0010](docs/adr/0010-batch-service-design.md))
+- Update `sun-moon-c-server`'s reader to use `order-service`'s new
+  `limit`/`offset` pagination (added alongside `batch-service`) instead of
+  fetching everything in one call — tracked on that repo's own side
 - Alembic migrations per service (today: `create_all` on startup)
 - A third service (e.g. `delivery-service`) to prove three services'
   events/contracts composing without any pairwise coupling

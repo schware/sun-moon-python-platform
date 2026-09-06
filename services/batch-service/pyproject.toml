@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "batch-service"
+version = "0.1.0"
+description = "Order-summary Job/Step/Chunk batch job over order-service's REST API"
+requires-python = ">=3.11"
+dependencies = [
+    "netframework-core",
+    "netframework-batch",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+netframework-core = { workspace = true }
+netframework-batch = { workspace = true }
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

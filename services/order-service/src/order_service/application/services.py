@@ -61,9 +61,9 @@ class OrderApplicationService:
             raise NotFoundError(f"order {order_id} not found")
         return self._to_response(order)
 
-    async def list_orders(self) -> list[OrderResponse]:
+    async def list_orders(self, *, limit: int = 100, offset: int = 0) -> list[OrderResponse]:
         async with SqlAlchemyUnitOfWork(self._session_factory, self._domain_event_bus) as uow:
-            orders = await SqlAlchemyOrderRepository(uow.session).list()
+            orders = await SqlAlchemyOrderRepository(uow.session).list(limit=limit, offset=offset)
         return [self._to_response(order) for order in orders]
 
     @staticmethod

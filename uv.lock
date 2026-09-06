@@ -9,7 +9,9 @@ resolution-markers = [
 [manifest]
 members = [
     "ai-agent-service",
+    "batch-service",
     "netframework-ai-agent",
+    "netframework-batch",
     "netframework-comms",
     "netframework-contracts",
     "netframework-core",
@@ -118,6 +120,34 @@ sdist = { url = "https://files.pythonhosted.org/packages/a5/ae/136395dfbfe00dfc9
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/ba/e2081de779ca30d473f21f5b30e0e737c438205440784c7dfc81efc2b029/async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c", size = 6233, upload-time = "2024-11-06T16:41:37.9Z" },
 ]
+
+[[package]]
+name = "batch-service"
+version = "0.1.0"
+source = { editable = "services/batch-service" }
+dependencies = [
+    { name = "httpx" },
+    { name = "netframework-batch" },
+    { name = "netframework-core" },
+    { name = "python-dotenv" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "netframework-batch", editable = "libs/netframework-batch" },
+    { name = "netframework-core", editable = "libs/netframework-core" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "certifi"
@@ -476,6 +506,28 @@ requires-dist = [
     { name = "netframework-core", editable = "libs/netframework-core" },
 ]
 provides-extras = ["anthropic"]
+
+[[package]]
+name = "netframework-batch"
+version = "0.1.0"
+source = { editable = "libs/netframework-batch" }
+dependencies = [
+    { name = "netframework-core" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "netframework-core", editable = "libs/netframework-core" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "netframework-comms"

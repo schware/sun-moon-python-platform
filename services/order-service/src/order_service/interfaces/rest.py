@@ -22,7 +22,7 @@ def create_router(service: OrderApplicationService) -> APIRouter:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.get("", response_model=list[OrderResponse])
-    async def list_orders() -> list[OrderResponse]:
-        return await service.list_orders()
+    async def list_orders(limit: int = 100, offset: int = 0) -> list[OrderResponse]:
+        return await service.list_orders(limit=limit, offset=offset)
 
     return router

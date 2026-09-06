@@ -54,10 +54,13 @@ libs/                          # 공유 라이브러리 — 모든 서비스가 
   netframework-ai-agent/       #   provider-agnostic 툴콜링 Agent 루프 + ToolRegistry
   netframework-contracts/      #   서비스 간 메시지를 위한 순수 pydantic 모델만 — 로직 없음,
                                 #   이 저장소의 다른 어떤 것에도 의존하지 않음
+  netframework-batch/          #   범용 Job/Step/Chunk 엔진(Reader/Processor/Writer Protocol) —
+                                #   sun-moon-c-server의 batch.h/batch.c에 대응하는 Python 쪽
 
 services/                      # 독립 배포 — 별도 프로세스, 별도 포트, 별도 DB
   order-service/                #   domain/ application/ infrastructure/ interfaces/ + main.py
   ai-agent-service/              #   application/ interfaces/ events/ + main.py
+  batch-service/                 #   jobs/ + main.py — 장수 서버가 아니라 일회성 CLI
 ```
 
 ## 왜 이게 모듈러 모놀리스가 아니라 monorepo인가
@@ -76,7 +79,7 @@ services/                      # 독립 배포 — 별도 프로세스, 별도 �
 대한 네트워크 호출뿐이다. 이것이 서로 다른 두 개발자가 이 두 서비스를
 소유하면서도 서로의 pull request를 절대 건드릴 필요가 없게 해준다.
 
-## 두 서비스를 잇는 두 개의 이음매
+## 서비스를 잇는 이음매들
 
 1. **동기 조회 — HTTP.** `ai-agent-service`의 `get_order` 도구
    (`services/ai-agent-service/src/ai_agent_service/application/order_client.py`)는
@@ -93,6 +96,14 @@ services/                      # 독립 배포 — 별도 프로세스, 별도 �
    자신의 에이전트에게 한 줄짜리 운영 노트를 작성하게 시킨다. 어느
    서비스도 상대의 도메인 모델을 import하지 않는다 — 공유된
    `OrderCreatedEvent` 모양만 알 뿐이다.
+
+3. **Chunk 단위 동기 조회 — HTTP, 페이지네이션.** `batch-service`의
+   `OrderServiceReader`(`services/batch-service/src/batch_service/jobs/order_summary.py`)는
+   order-service의 공개 `GET /orders?limit=&offset=`을 chunk 단위로
+   페이지네이션하면서 범용 Job/Step/Chunk 엔진(`libs/netframework-batch`)에
+   먹인다 — [`sun-moon-c-server`](https://github.com/schware/sun-moon-c-server)의
+   `batch_runner`와 같은 설계, 같은 REST 계약이다(직접 비교는 그 저장소의
+   ADR-0001과 이 저장소의 [ADR-0010](docs/adr/0010-batch-service-design_kr.md) 참고).
 
 도메인 이벤트 vs. 통합 이벤트를 구체적으로 보면:
 `order_service.domain.events.OrderCreated`(내부용, `UnitOfWork`가 드레인,
@@ -138,6 +149,12 @@ printf 'hello\nORDER_COUNT\n' | nc localhost 8090   # order-service의 TCP 어�
 위의 `curl -X POST /orders` 이후 ai-agent-service의 터미널을 보면 —
 `ai_agent_order_note` 로그 라인이 나타난다, 순전히 Redis를 통해 전달된 것이다.
 
+Batch job 실행(일회성 — 끝나면 종료, 계속 띄워둘 터미널 필요 없음):
+```bash
+uv run --package batch-service python -m batch_service.main
+cat reports/order_daily_summary_summary.json   # {"order_count": N, "total_revenue_cents": ...}
+```
+
 ## Quick start (Docker Compose — 진짜 Redis)
 
 ```bash
@@ -153,14 +170,17 @@ docker compose up --build
 ```bash
 uv run --package order-service pytest services/order-service/tests
 uv run --package ai-agent-service pytest services/ai-agent-service/tests
+uv run --package batch-service pytest services/batch-service/tests
+uv run --package netframework-batch pytest libs/netframework-batch/tests
 ```
-두 테스트 스위트 모두 **Redis도 없고 서비스 간 네트워크 호출도 없이**
-돌아간다 — `order-service`의 테스트는
+모든 스위트가 **Redis도, 진짜 order-service도, 서비스 간 네트워크
+호출도 없이** 돌아간다 — `order-service`의 테스트는
 `netframework_core.eventbus.local_bus.LocalEventBus`를 갈아끼워서 실제로
 무엇을 발행하려 했는지 검증하고, `ai-agent-service`의 테스트는 진짜
-HTTP/에이전트 호출 대신 `FakeOrderClient`/`RecordingAssistant`를 쓴다. 이게
-가능한 이유는 위의 두 이음매가 둘 다 생성자로 주입되는 인터페이스라서다 —
-하드코딩된 게 아니다.
+HTTP/에이전트 호출 대신 `FakeOrderClient`/`RecordingAssistant`를 쓰고,
+`batch-service`의 테스트는 진짜 HTTP 연결 대신 `httpx.MockTransport`로
+만든 `OrderServiceReader`를 주입한다. 이게 가능한 이유는 위의 모든
+이음매가 생성자로 주입되는 인터페이스라서다 — 하드코딩된 게 아니다.
 
 ## 새 서비스 추가하기
 
@@ -189,10 +209,12 @@ Anthropic SDK(선택, 실제 에이전트 추론용).
 
 ## 다음 계획
 
-- `order-service`의 기존 REST API 위에 Job → Step → Chunk
-  (Reader/Processor/Writer) 패턴을 구현하는 `batch-service` — 이유는
-  [`alignment`](https://github.com/schware/alignment) 저장소의 ADR-0006
-  참고(같은 설계를 C로 구현하는 `sun-moon-c-server` 쪽 짝도 함께 계획됨)
+- `batch-service`의 자체 문서에 `sun-moon-c-server`의 order-summary
+  job과의 직접 비교 메모 추가(둘 다 같은 설계를 구현함 —
+  [ADR-0010](docs/adr/0010-batch-service-design_kr.md) 참고)
+- `sun-moon-c-server`의 reader가 `batch-service`와 함께 새로 추가된
+  `order-service`의 `limit`/`offset` 페이지네이션을 쓰도록 갱신 — 한
+  번에 다 받아오는 대신(그 저장소 쪽에서 추적 중)
 - 서비스별 Alembic 마이그레이션(지금은 시작할 때 `create_all`)
 - 세 번째 서비스(예: `delivery-service`) 추가 — 세 서비스의
   이벤트/계약이 쌍끼리 결합 없이 잘 조합되는지 검증

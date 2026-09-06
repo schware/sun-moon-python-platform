@@ -22,6 +22,29 @@ async def test_create_and_get_order(app):
         assert len((await client.get("/orders")).json()) == 1
 
 
+async def test_list_orders_pagination(app):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        for i in range(5):
+            await client.post(
+                "/orders", json={"lines": [{"sku": f"SKU-{i}", "quantity": 1, "unit_price_cents": 100}]}
+            )
+
+        # default (no params) keeps existing behavior: everything up to the default limit
+        assert len((await client.get("/orders")).json()) == 5
+
+        page1 = (await client.get("/orders", params={"limit": 2, "offset": 0})).json()
+        page2 = (await client.get("/orders", params={"limit": 2, "offset": 2})).json()
+        page3 = (await client.get("/orders", params={"limit": 2, "offset": 4})).json()
+
+        assert len(page1) == 2
+        assert len(page2) == 2
+        assert len(page3) == 1
+        # pages don't overlap and together cover every order exactly once
+        all_ids = {o["id"] for o in page1 + page2 + page3}
+        assert len(all_ids) == 5
+
+
 async def test_create_order_publishes_integration_event(app, integration_events):
     received: list[OrderCreatedEvent] = []
 
