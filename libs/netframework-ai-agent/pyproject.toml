@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netframework-ai-agent"
+version = "0.1.0"
+description = "Provider-agnostic tool-calling AI agent loop (echo / anthropic providers)"
+requires-python = ">=3.11"
+dependencies = ["netframework-core"]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+netframework-core = { workspace = true }

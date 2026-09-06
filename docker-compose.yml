@@ -1,0 +1,32 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: sqlite+aiosqlite:///./data/order.db
+      HTTP_PORT: "8081"
+    ports: ["8081:8081", "8090:8090"]
+    depends_on: [redis]
+    volumes: ["order-data:/app/services/order-service/data"]
+
+  ai-agent-service:
+    build:
+      context: .
+      dockerfile: services/ai-agent-service/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      ORDER_SERVICE_BASE_URL: http://order-service:8081
+      HTTP_PORT: "8082"
+      AI_PROVIDER: echo # switch to "anthropic" + set ANTHROPIC_API_KEY for real reasoning
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports: ["8082:8082"]
+    depends_on: [redis, order-service]
+
+volumes:
+  order-data:

@@ -1,0 +1,9 @@
+# Virtual workspace root — no [project] table on purpose. This repo ships
+# no code of its own; it only tells uv which packages live under it so
+# `uv run`/`uv sync` can resolve every lib/service together and let
+# services depend on libs via {workspace = true} (see services/*/pyproject.toml).
+[tool.uv.workspace]
+members = ["libs/*", "services/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

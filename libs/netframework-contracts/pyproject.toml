@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netframework-contracts"
+version = "0.1.0"
+description = "Shared wire contracts (integration events, cross-service DTOs) — no business logic"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

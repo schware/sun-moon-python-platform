@@ -1,0 +1,29 @@
+# This file is a template for recording, as code, "who has to review/approve
+# what." GitHub/GitLab recognize this filename automatically and add the
+# relevant path's owners as PR reviewers (only takes effect once this repo
+# is actually hosted on GitHub/GitLab — it isn't a git repository yet, so
+# it's not enforced right now. See CONTRIBUTING.md "Scaling from individual
+# -> team -> project").
+#
+# Keep the placeholders (@team-<service-name>) until real owners are known.
+# Once people are assigned, replace these lines with actual GitHub
+# usernames/teams.
+
+# Shared libraries — changing these affects every service.
+# ADR-0001 rule: a libs/ change needs an ADR + sign-off from every owner below.
+/libs/netframework-core/          @team-platform
+/libs/netframework-comms/         @team-platform
+/libs/netframework-ai-agent/      @team-ai
+/libs/netframework-contracts/     @team-platform @team-order @team-ai
+
+# Services — each team/individual can freely change their own service's
+# internals (domain/application/infrastructure/interfaces). A change that
+# breaks the public contract (REST response shape, an event shape listed in
+# netframework-contracts) follows the rule above instead.
+/services/order-service/          @team-order
+/services/ai-agent-service/       @team-ai
+
+# Direction / rationale — changes here affect every stakeholder and get reviewed as such.
+/docs/adr/                        @team-platform @team-order @team-ai
+/README.md                        @team-platform
+/CONTRIBUTING.md                  @team-platform

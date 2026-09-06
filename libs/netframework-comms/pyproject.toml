@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netframework-comms"
+version = "0.1.0"
+description = "Protocol adapters: HTTP+WS app factory (FastAPI), asyncio TCP line-protocol, asyncio UDP echo"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "netframework-core",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+netframework-core = { workspace = true }
