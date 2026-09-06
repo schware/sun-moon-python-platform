@@ -192,6 +192,11 @@ httpx (inter-service HTTP), Anthropic SDK (optional, real agent reasoning).
 
 ## Planned next steps
 
+- A `batch-service` implementing the Job → Step → Chunk
+  (Reader/Processor/Writer) pattern over `order-service`'s existing REST
+  API — see the [`alignment`](https://github.com/schware/alignment) repo's
+  ADR-0006 for why (a companion `sun-moon-c-server` implementation of the
+  same design, in C, is planned there too)
 - Alembic migrations per service (today: `create_all` on startup)
 - A third service (e.g. `delivery-service`) to prove three services'
   events/contracts composing without any pairwise coupling

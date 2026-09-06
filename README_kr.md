@@ -189,6 +189,10 @@ Anthropic SDK(선택, 실제 에이전트 추론용).
 
 ## 다음 계획
 
+- `order-service`의 기존 REST API 위에 Job → Step → Chunk
+  (Reader/Processor/Writer) 패턴을 구현하는 `batch-service` — 이유는
+  [`alignment`](https://github.com/schware/alignment) 저장소의 ADR-0006
+  참고(같은 설계를 C로 구현하는 `sun-moon-c-server` 쪽 짝도 함께 계획됨)
 - 서비스별 Alembic 마이그레이션(지금은 시작할 때 `create_all`)
 - 세 번째 서비스(예: `delivery-service`) 추가 — 세 서비스의
   이벤트/계약이 쌍끼리 결합 없이 잘 조합되는지 검증
